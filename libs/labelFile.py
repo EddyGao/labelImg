@@ -24,7 +24,8 @@ class LabelFile(object):
         self.shapes = ()
         self.imagePath = None
         self.imageData = None
-        self.verified = False
+        if filename is not None:
+            self.load(filename)
 
     def savePascalVocFormat(self, filename, shapes, imagePath, imageData,
                             lineColor=None, fillColor=None, databaseSrc=None):
@@ -38,23 +39,16 @@ class LabelFile(object):
         image.load(imagePath)
         imageShape = [image.height(), image.width(),
                       1 if image.isGrayscale() else 3]
-        writer = PascalVocWriter(imgFolderName, imgFileNameWithoutExt,
-                                 imageShape, localImgPath=imagePath)
-        writer.verified = self.verified
-
+        writer = PascalVocWriter(imgFolderName, imgFileName,
+                                 imageShape)
         for shape in shapes:
             points = shape['points']
             label = shape['label']
-            # Add Chris 
-            difficult = int(shape['difficult'])
             bndbox = LabelFile.convertPoints2BndBox(points)
-            writer.addBndBox(bndbox[0], bndbox[1], bndbox[2], bndbox[3], label, difficult)
+            writer.addBndBox(bndbox[0], bndbox[1], bndbox[2], bndbox[3], label)
 
         writer.save(targetFile=filename)
         return
-
-    def toggleVerify(self):
-        self.verified = not self.verified
 
     @staticmethod
     def isLabelFile(filename):
@@ -78,10 +72,10 @@ class LabelFile(object):
         # Martin Kersner, 2015/11/12
         # 0-valued coordinates of BB caused an error while
         # training faster-rcnn object detector.
-        if xmin < 1:
+        if (xmin < 1):
             xmin = 1
 
-        if ymin < 1:
+        if (ymin < 1):
             ymin = 1
 
         return (int(xmin), int(ymin), int(xmax), int(ymax))
