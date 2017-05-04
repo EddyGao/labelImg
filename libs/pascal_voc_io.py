@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf8 -*-
+import _init_path
 import sys
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element, SubElement
@@ -11,15 +12,13 @@ XML_EXT = '.xml'
 
 class PascalVocWriter:
 
-    def __init__(self, foldername, filename, imgSize,databaseSrc='Unknown', localImgPath=None):
+    def __init__(self, foldername, filename, imgSize, databaseSrc='Unknown'):
         self.foldername = foldername
         self.filename = filename
         self.databaseSrc = databaseSrc
         self.imgSize = imgSize
         self.boxlist = []
-        self.localImgPath = localImgPath
-        self.verified = False
-
+        #self.localImgPath = localImgPath
 
     def prettify(self, elem):
         """
@@ -40,16 +39,14 @@ class PascalVocWriter:
             return None
 
         top = Element('annotation')
-        top.set('verified', 'yes' if self.verified else 'no')
-
         folder = SubElement(top, 'folder')
         folder.text = self.foldername
 
         filename = SubElement(top, 'filename')
         filename.text = self.filename
 
-        localImgPath = SubElement(top, 'path')
-        localImgPath.text = self.localImgPath
+        #localImgPath = SubElement(top, 'path')
+        #localImgPath.text = self.localImgPath
 
         source = SubElement(top, 'source')
         database = SubElement(source, 'database')
@@ -70,10 +67,9 @@ class PascalVocWriter:
         segmented.text = '0'
         return top
 
-    def addBndBox(self, xmin, ymin, xmax, ymax, name, difficult):
+    def addBndBox(self, xmin, ymin, xmax, ymax, name):
         bndbox = {'xmin': xmin, 'ymin': ymin, 'xmax': xmax, 'ymax': ymax}
         bndbox['name'] = name
-        bndbox['difficult'] = difficult
         self.boxlist.append(bndbox)
 
     def appendObjects(self, top):
@@ -88,14 +84,9 @@ class PascalVocWriter:
             pose = SubElement(object_item, 'pose')
             pose.text = "Unspecified"
             truncated = SubElement(object_item, 'truncated')
-            if int(each_object['ymax']) == int(self.imgSize[0]) or (int(each_object['ymin'])== 1):
-                truncated.text = "1" # max == height or min
-            elif (int(each_object['xmax'])==int(self.imgSize[1])) or (int(each_object['xmin'])== 1):
-                truncated.text = "1" # max == width or min
-            else:
-                truncated.text = "0"
-            difficult = SubElement(object_item, 'Difficult')
-            difficult.text = str( bool(each_object['difficult']) & 1 )
+            truncated.text = "0"
+            difficult = SubElement(object_item, 'difficult')
+            difficult.text = "0"
             bndbox = SubElement(object_item, 'bndbox')
             xmin = SubElement(bndbox, 'xmin')
             xmin.text = str(each_object['xmin'])
@@ -125,39 +116,41 @@ class PascalVocReader:
 
     def __init__(self, filepath):
         # shapes type:
-        # [labbel, [(x1,y1), (x2,y2), (x3,y3), (x4,y4)], color, color, difficult]
+        # [labbel, [(x1,y1), (x2,y2), (x3,y3), (x4,y4)], color, color]
         self.shapes = []
         self.filepath = filepath
-        self.verified = False
         self.parseXML()
 
     def getShapes(self):
         return self.shapes
 
-    def addShape(self, label, bndbox, difficult):
+    def addShape(self, label, bndbox):
         xmin = int(bndbox.find('xmin').text)
         ymin = int(bndbox.find('ymin').text)
         xmax = int(bndbox.find('xmax').text)
         ymax = int(bndbox.find('ymax').text)
         points = [(xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)]
-        self.shapes.append((label, points, None, None, difficult))
+        self.shapes.append((label, points, None, None))
 
     def parseXML(self):
-        assert self.filepath.endswith(XML_EXT), "Unsupport file format"
+        assert self.filepath.endswith('.xml'), "Unsupport file format"
         parser = etree.XMLParser(encoding='utf-8')
         xmltree = ElementTree.parse(self.filepath, parser=parser).getroot()
         filename = xmltree.find('filename').text
-        try:
-            verified = xmltree.attrib['verified']
-            if verified == 'yes':
-                self.verified = True
-        except KeyError:
-            self.verified = False
 
         for object_iter in xmltree.findall('object'):
             bndbox = object_iter.find("bndbox")
             label = object_iter.find('name').text
-            # Add chris
-            difficult = bool(int(object_iter.find('Difficult').text))
-            self.addShape(label, bndbox, difficult)
+            self.addShape(label, bndbox)
         return True
+
+
+# tempParseReader = PascalVocReader('test.xml')
+# print tempParseReader.getShapes()
+"""
+# Test
+tmp = PascalVocWriter('temp','test', (10,20,3))
+tmp.addBndBox(10,10,20,30,'chair')
+tmp.addBndBox(1,1,600,600,'car')
+tmp.save()
+"""
